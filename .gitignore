@@ -16,3 +16,8 @@
 *.toc
 *.vrb
 
+# instructions
+coursework.*
+lg/
+*.md
+!README.md

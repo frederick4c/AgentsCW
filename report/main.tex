@@ -205,36 +205,46 @@ Since $\mathbb{E}[\bar r]=\mu$,
     \qquad
     \mathbb{E}[X_i]=h_i\mathbb{E}[\hat A_i]=0,
     \qquad
-    \mathbb{E}[\hat g]=0.
+    \mathbb{E}[\hat g]
+    =\frac{1}{K}\sum_{i=1}^{K}\mathbb{E}[X_i]=0.
 \]
-Here the responses, and hence their score vectors, are fixed; the expectation is only
-over independent reward noise.  In the policy-gradient expectation the responses are
-instead sampled from the policy, so response quality and score can be correlated and
-the gradient need not vanish.
+This expectation averages only reward noise around fixed completions.  In
+GRPO/RLHF the completions are sampled from the policy, so the score
+$\nabla_\theta\log\pi_\theta(a\mid q)$ can be correlated with the reward of
+the sampled completion and the policy gradient need not vanish.
 
 \paragraph{(ii)}
-Writing
+The common random term is the group mean $\bar r$, which appears in every
+advantage:
 \[
-    X_i=\frac{h_i}{\sigma}r_i
-        -\frac{h_i}{K\sigma}\sum_{\ell=1}^{K}r_\ell
+    X_i=h_i\hat A_i=\frac{h_i}{\sigma}(r_i-\bar r).
 \]
-exhibits the shared random term, namely the group-mean contribution
-$-h_i\bar r/\sigma$.  For $i\ne j$, independence of the rewards gives
+For $i\ne j$,
 \begin{align*}
+    \operatorname{Cov}(X_i,X_j)
+    &=\frac{h_i h_j^\top}{\sigma^2}
+      \operatorname{Cov}(r_i-\bar r,r_j-\bar r),\\
     \operatorname{Cov}(r_i-\bar r,r_j-\bar r)
     &=0-\frac{\sigma^2}{K}-\frac{\sigma^2}{K}
       +\frac{\sigma^2}{K}
-      =-\frac{\sigma^2}{K},\\
-    \operatorname{Cov}(X_i,X_j)
-    &= -\frac{1}{K}h_i h_j^\top .
+      =-\frac{\sigma^2}{K}.
 \end{align*}
-Thus the cross-covariance has a negative coefficient: an unusually large $r_i$
-raises $\bar r$, thereby reducing every other normalised advantage.
+Therefore
+\[
+    \boxed{
+        \operatorname{Cov}(X_i,X_j)=-\frac{1}{K}h_i h_j^\top,
+        \qquad i\ne j.
+    }
+\]
+The negative sign is the price of using a group-centred contrast: if one
+completion is above the group mean, the others are pushed below that same
+mean.  This removes prompt-level reward offsets in GRPO, but the $K$
+rollouts are no longer $K$ independent gradient samples.
 
 \paragraph{(iii)}
-The diagonal terms are
-$\operatorname{Var}(X_i)=(1-K^{-1})h_i h_i^\top$.  Therefore, with
-$\bar h=K^{-1}\sum_i h_i$,
+Since
+$\operatorname{Var}(X_i)=(1-K^{-1})h_i h_i^\top$ and the off-diagonal
+covariances are as above, with $\bar h=K^{-1}\sum_i h_i$,
 \begin{equation}
     \operatorname{Var}(\hat g)
     =\frac{1}{K^2}\left[
@@ -245,10 +255,9 @@ $\bar h=K^{-1}\sum_i h_i$,
     =\frac{1}{K^2}\sum_i(h_i-\bar h)(h_i-\bar h)^\top .
     \label{eq:q1-var-g}
 \end{equation}
-This is generally not the naive i.i.d.\ value
-$K^{-1}\operatorname{Var}(X_1)$.
-Because these are covariance matrices, an effective sample size requires a scalar
-projection.  In a direction $u$ define
+The naive i.i.d.\ calculation would miss the subtraction of
+$K^{-1}(\sum_i h_i)(\sum_j h_j)^\top$.  To turn the covariance comparison
+into a scalar effective sample size, fix a direction $u$ and define
 \begin{equation}
     K_{\mathrm{eff}}(u)
     :=\frac{u^\top\operatorname{Var}(X_1)u}
@@ -266,19 +275,22 @@ rotation-invariant trace summary is
     =\frac{K(K-1)\lVert h_1\rVert^2}
            {\sum_i\lVert h_i-\bar h\rVert^2}.
 \]
-For comparable, non-degenerate score vectors,
-the denominator grows as $O(K)$ and $K_{\mathrm{eff}}=O(K)$, although its
-constant need not equal the i.i.d.\ one.  If $h_i=c_i v$ are all aligned,
-\cref{eq:q1-var-g} is rank one and only variation in the $c_i$ remains; if
-all $h_i$ are equal, $\hat g=h_1K^{-1}\sum_i\hat A_i=0$ exactly.
+For comparable non-degenerate scores, the denominator grows as $O(K)$, so
+$K_{\mathrm{eff}}=O(K)$, but the constant is determined by diversity of the
+score vectors, not just by rollout count.  If $h_i=c_i v$ are all aligned,
+\cref{eq:q1-var-g} is rank one and only scalar variation in the $c_i$ is
+learnable from the group contrast.  If all $h_i$ are identical then
+$\hat g=h_1K^{-1}\sum_i\hat A_i=0$ exactly: group normalisation has removed
+all fixed-prompt signal.
 
 \subsubsection*{Question 2}
 \addcontentsline{toc}{subsubsection}{Question 2}
 
 \paragraph{(i)}
-Assume $\pi_t(a)>0$ on the admissible support and, in the measurable case,
-that the normaliser below is finite.  Let $\lambda$ enforce
-$\sum_a\pi(a)=1$.  Stationarity of the Lagrangian gives
+Assume $\pi_t(a)>0$ on its support and, in the measurable case, that the
+normaliser below is finite.  Any optimiser must have support contained in
+that of $\pi_t$, since otherwise $\operatorname{KL}(\pi\Vert\pi_t)=\infty$.
+With $\lambda$ enforcing $\sum_a\pi(a)=1$, stationarity gives
 \[
     A_t(a)-\frac{1}{\eta}
        \left(\log\frac{\pi(a)}{\pi_t(a)}+1\right)+\lambda=0.
@@ -292,9 +304,11 @@ Normalising the resulting exponential tilt yields the unique optimiser
     Z_t=\sum_b\pi_t(b)\exp\{\eta A_t(b)\}.
     \label{eq:q2-exp-update}
 \end{equation}
-Strict concavity from the negative KL term gives uniqueness.  Small $\eta$
-keeps $\pi_{t+1}$ close to $\pi_t$; increasing $\eta$ weakens the KL
-regularisation and makes a larger step towards high-advantage actions.
+The objective is strictly concave on this support, so the optimiser is
+unique.  This is the KL mirror-descent or exponential-tilting update:
+small $\eta$ gives a conservative RLHF step near $\pi_t$, while large
+$\eta$ concentrates probability on high-advantage responses but cannot put
+mass on responses assigned zero probability by $\pi_t$.
 
 \paragraph{(ii)}
 Let
@@ -310,22 +324,25 @@ of \cref{eq:q2-exp-update} then implies
     \geq 0
     =J(\pi_t).
 \]
-Thus the exact unrestricted update is monotone.  In neural-network GRPO the
-group-normalised advantage is a noisy approximation and stochastic
-optimisation need not find the exact distributional maximiser, so the
-guarantee can fail.
+Thus the exact unrestricted update is monotone in this advantage objective.
+In neural-network GRPO the exponential-tilted distribution may be outside
+the model or LoRA-adapter family, and the advantage is a finite-sample,
+group-normalised estimate.  Either approximation, especially with degenerate
+groups where $\sigma_r$ is tiny or zero, can break the guarantee.
 
 \paragraph{(iii)}
 For $\hat A_t>0$, clipping removes the incentive to increase the sampled
 ratio beyond $1+\varepsilon$; for $\hat A_t<0$, it removes the incentive to
-decrease it below $1-\varepsilon$.  This is an advantage-dependent,
-samplewise \emph{soft} trust region: it does not enforce either bound, since
-shared parameter updates or other samples can still move a ratio outside the
-interval.  By contrast,
+decrease it below $1-\varepsilon$.  The resulting trust region is
+advantage-dependent, samplewise, and soft: it clips the objective on sampled
+actions, but does not enforce the ratio bounds after a shared neural update.
+By contrast,
 $\operatorname{KL}(\pi_\theta(\cdot\mid q)\Vert
 \pi_{\mathrm{old}}(\cdot\mid q))\leq\delta$ is one hard,
 distribution-level constraint; it can permit a large change on some actions
-provided the joint KL budget remains satisfied.
+provided the joint KL budget remains satisfied.  In LLM RLHF this means PPO
+clipping can miss unsampled completions and prompt-level KL spikes, whereas
+a KL constraint directly budgets total distributional drift.
 
 \subsubsection*{Question 3}
 \addcontentsline{toc}{subsubsection}{Question 3}
@@ -333,7 +350,7 @@ provided the joint KL budget remains satisfied.
 \paragraph{(i)}
 For any integrand $f$,
 $\mathbb{E}_{\pi_{\mathrm{old}}}[f]
-=\mathbb{E}_{\pi_{\mathrm{mix}}}[wf]$, where
+=\mathbb{E}_{\pi_{\mathrm{mix}}}[wf]$, with
 \begin{equation}
     w_i
     =\frac{\pi_{\mathrm{old}}(a_i\mid q)}
@@ -343,7 +360,8 @@ $\mathbb{E}_{\pi_{\mathrm{old}}}[f]
              +\alpha\pi_{\mathrm{unif}}(a_i\mid q)}.
     \label{eq:q3-weight}
 \end{equation}
-Thus the direct importance-corrected version of the stated GRPO estimator is
+Thus the direct importance-corrected version of the stated, group-normalised
+estimator is
 \begin{equation}
     \hat g_{\mathrm{mix}}
     =\frac{1}{K}\sum_{i=1}^{K}
@@ -368,39 +386,32 @@ Linearity of expectation gives
 \]
 Consequently, multiplying by $w_i$ outside the advantage does not change the
 fact that the unweighted $\bar r$ estimates $V^{\pi_{\mathrm{mix}}}$ rather
-than $V^{\pi_{\mathrm{old}}}$.  At the special point
-$\pi_\theta=\pi_{\mathrm{old}}$, an independent constant baseline cancels
-because $\mathbb{E}_{\pi_{\mathrm{old}}}[\nabla\log\pi_{\mathrm{old}}]=0$;
-the random same-group $\bar r$ is not independent, however.  A common
-consistent correction is
-\[
-    \hat V_{\mathrm{SN}}
-      =\frac{\sum_jw_jr_j}{\sum_jw_j},
-    \qquad
-    \tilde A_i=\frac{r_i-\hat V_{\mathrm{SN}}}{\sigma_r},
-\]
-which also reduces to the stated GRPO advantage when $\alpha\to0$.
-However, self-normalisation and reusing sample $i$ in its own baseline cause
-finite-sample bias.  For an exactly unbiased baseline correction, use a fixed
-or independently estimated scale $s$ and the leave-one-out importance
-baseline
+than $V^{\pi_{\mathrm{old}}}$.  For the fixed-scale target
+$\mathbb{E}_{\pi_{\mathrm{old}}}[
+\nabla_\theta\log\pi_\theta(a\mid q)(R(q,a)-V^{\pi_{\mathrm{old}}})/s]$,
+use the leave-one-out weighted baseline
 \begin{equation}
     \hat V_{-i}
       =\frac{1}{K-1}\sum_{j\ne i}w_jr_j,
     \qquad
-    \tilde A_i^{\mathrm{LOO}}
-      =\frac{r_i-\hat V_{-i}}{s}.
+    \hat g_{\mathrm{mix}}^{\mathrm{LOO}}
+      =\frac{1}{K}\sum_i
+        w_i\nabla_\theta\log\pi_\theta(a_i\mid q)
+        \frac{r_i-\hat V_{-i}}{s}.
     \label{eq:q3-loo-adv}
 \end{equation}
 Indeed, $\mathbb{E}_{\pi_{\mathrm{mix}}}[\hat V_{-i}]
-=V^{\pi_{\mathrm{old}}}$ and $\hat V_{-i}$ is independent of $a_i$.
-Therefore substituting \cref{eq:q3-loo-adv} into
-\cref{eq:q3-raw-mix} is unbiased for the corresponding fixed-scale
-$\pi_{\mathrm{old}}$ score--advantage expectation.  Using the same group's
-empirical $\sigma_r$ retains the usual finite-sample normalisation bias.
+=V^{\pi_{\mathrm{old}}}$ and $\hat V_{-i}$ is independent of $a_i$, so
+\cref{eq:q3-loo-adv} is unbiased for that old-policy score--advantage
+expectation.  The common self-normalised baseline
+$\hat V_{\mathrm{SN}}=\sum_jw_jr_j/\sum_jw_j$ is often lower variance and
+consistent, but it is biased at finite $K$; using the same group's empirical
+$\sigma_r$ adds the usual GRPO normalisation bias and fails when the group
+reward variance is zero.
 
 \paragraph{(iv)}
-First, the unweighted reward variance under the proposal is
+There are two variance effects.  First, the unweighted reward variance under
+the proposal is
 \begin{align*}
     \operatorname{Var}_{\pi_{\mathrm{mix}}}(R)
     ={}&(1-\alpha)\operatorname{Var}_{\pi_{\mathrm{old}}}(R)
@@ -408,25 +419,25 @@ First, the unweighted reward variance under the proposal is
       &+\alpha(1-\alpha)
         \bigl(V^{\pi_{\mathrm{old}}}-V^{\pi_{\mathrm{unif}}}\bigr)^2 .
 \end{align*}
-It therefore increases when uniform responses have larger reward variance,
-or a sufficiently different mean; for example, when uniform sampling exposes
-many extreme invalid and accidentally correct responses.  It decreases when
-$V^{\pi_{\mathrm{unif}}}\simeq V^{\pi_{\mathrm{old}}}$ and
+Thus mixing increases advantage variance when the uniform sampler has much
+larger reward variance or a very different mean, as with rare correct
+answers mixed with many invalid LLM completions.  It decreases raw advantage
+variance when $V^{\pi_{\mathrm{unif}}}\simeq V^{\pi_{\mathrm{old}}}$ and
 $\operatorname{Var}_{\pi_{\mathrm{unif}}}(R)
-<\operatorname{Var}_{\pi_{\mathrm{old}}}(R)$.
+<\operatorname{Var}_{\pi_{\mathrm{old}}}(R)$, for example if uniform
+exploration smooths a spiky old-policy reward distribution.
 
-Importance weighting adds a second effect.  For a scalar projection $Y$ of
-the score--advantage term, the leading per-sample second moment is
+Second, importance weighting changes the gradient estimator variance.  For a
+scalar projection $Y$ of the score--advantage term,
 \[
     \mathbb{E}_{\pi_{\mathrm{mix}}}[w^2Y^2]
     =\mathbb{E}_{\pi_{\mathrm{old}}}[wY^2].
 \]
-Thus mixing increases estimator variance if large $|Y|$ occurs where
-$\pi_{\mathrm{old}}>\pi_{\mathrm{mix}}$ (so $w>1$), but can decrease it if
-the uniform component moves proposal mass towards large-$|Y|$ responses
-that $\pi_{\mathrm{old}}$ under-samples (so $w<1$ there).  Hence lower raw
-advantage variance alone does not guarantee lower variance of
-$\hat g_{\mathrm{mix}}$.
+Therefore lower raw reward variance does not guarantee lower gradient
+variance: large-$|Y|$ samples in regions where
+$\pi_{\mathrm{old}}>\pi_{\mathrm{mix}}$ get $w>1$ and can dominate, while
+putting proposal mass on high-signal responses that $\pi_{\mathrm{old}}$
+under-samples can reduce variance by making their weights smaller.
 
 \paragraph{(v)}
 Under the stated assumption,
@@ -439,13 +450,13 @@ component assigns more probability than $\pi_{\mathrm{old}}$; more formally,
 $\mathbb{E}_{\pi_{\mathrm{mix}}}
 [\log(\pi_{\mathrm{old}}/\pi_{\mathrm{mix}})]
 =-\operatorname{KL}(\pi_{\mathrm{mix}}\Vert\pi_{\mathrm{old}})<0$, so the
-geometrically typical per-token ratio is below one.  Consequently most long
-responses contribute almost nothing while a few rare, large-weight responses
-dominate, giving a very small effective sample size and an unreliable
-gradient.  One concrete fix is to scale the mixture coefficient as
-$\alpha=\gamma/T$, keeping the cumulative proposal perturbation, and hence
-typical log-weight magnitude, $O(1)$; the trade-off is progressively weaker
-uniform exploration for longer responses.
+geometrically typical token ratio is below one.  Consequently most long
+responses have negligible weight while a few rare trajectories dominate,
+which is disastrous for long-form LLM RLHF because the effective sample size
+collapses exponentially with response length.  One concrete fix is to scale
+the mixture coefficient as $\alpha=\gamma/T$, keeping the cumulative
+proposal perturbation, and hence typical log-weight magnitude, $O(1)$; the
+trade-off is weaker uniform exploration for longer responses.
 
 % ============================================================
 \section*{Part II: Adaptive planning in \code{cmbagent\_lg}}
