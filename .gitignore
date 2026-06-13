@@ -17,7 +17,10 @@
 *.vrb
 
 # instructions
-coursework.*
-lg/
-*.md
+coursework.pdf
+external/
+# context/
+# agents/
 !README.md
+
+.DS_Store

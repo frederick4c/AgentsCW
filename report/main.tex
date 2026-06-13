@@ -46,7 +46,7 @@
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\repo}{\href{https://gitlab.developers.cam.ac.uk/YOUR-CRSID/YOUR-REPO}{GitLab repository}}
 \newcommand{\wandb}{\href{https://wandb.ai/YOUR-PROJECT/YOUR-RUN}{W\&B run}}
-\newcommand{\cmbcommit}{\href{https://github.com/borisbolliet/cmbagent_lg/tree/adaptive-planning}{cmbagent\_lg adaptive-planning branch}}
+\newcommand{\cmbcommit}{\href{https://github.com/borisbolliet/cmbagent_lg/tree/d7d0592a714e4cc01c97f1b77afdd57a208b18db}{\code{cmbagent\_lg}}}
 \newcommand{\TODO}[1]{\textcolor{red}{[TODO: #1]}}
 
 \setlist[itemize]{leftmargin=*,topsep=2pt,itemsep=1pt}
@@ -59,7 +59,7 @@
 % Metadata
 % ------------------------------------------------------------
 \title{Multi-Agent Systems and Agentic AI\\Practical Examination Report}
-\author{Frederick Lawrence \\ CRSid: fl482 \\ Team members for Part I: Name 1, Name 2}
+\author{Frederick Lawrence \\ CRSid: fl482 \\ Team members for Part I: Baron Gracias, Harvey Bermingham}
 \date{\today}
 
 \begin{document}
@@ -67,7 +67,7 @@
 \maketitle
 
 \noindent\textbf{Repository and logs.}
-The code used for Part I is available at \repo. Training and evaluation logs are available at \wandb. The adaptive-planning implementation studied in Part II is linked at \cmbcommit. Replace these placeholders with exact clickable URLs, including the exact commit where required.
+The code used for Part I is available at \repo. Training and evaluation logs are available at \wandb. The adaptive-planning implementation studied in Part II is linked at \cmbcommit. Replace the Part I placeholders with exact clickable URLs.
 
 \vspace{0.5em}
 \noindent\textbf{Notes on jointly owned work.}
@@ -425,7 +425,7 @@ proposal perturbation, and hence typical log-weight magnitude, $O(1)$; the
 trade-off is weaker uniform exploration for longer responses.
 
 % ============================================================
-\section*{Part II: Adaptive planning in \code{cmbagent\_lg}}
+\section*{Part II: Adaptive planning in \cmbcommit}
 \addcontentsline{toc}{section}{Part II: Adaptive planning in cmbagent\_lg}
 % Part II should be at most 2 pages, excluding the workflow diagram.
 
@@ -434,57 +434,81 @@ trade-off is weaker uniform exploration for longer responses.
 
 \begin{figure}[H]
     \centering
-    % Replace this TikZ sketch with the final workflow diagram once the implementation has been studied.
-    \begin{tikzpicture}[
-        node distance=1.2cm and 1.6cm,
-        box/.style={draw,rounded corners,align=center,minimum width=2.8cm,minimum height=0.9cm},
-        decision/.style={draw,diamond,aspect=2,align=center,inner sep=1pt},
-        arrow/.style={-Latex,thick}
-    ]
-        \node[box] (input) {User query\\initial state};
-        \node[box,right=of input] (planner) {Planner};
-        \node[box,right=of planner] (reviewer) {Plan reviewer};
-        \node[box,below=of reviewer] (execute) {Execute next step};
-        \node[decision,left=of execute] (adapt) {Revise\\plan?};
-        \node[box,left=of adapt] (finish) {Final answer};
-
-        \draw[arrow] (input) -- (planner);
-        \draw[arrow] (planner) -- (reviewer);
-        \draw[arrow] (reviewer) -- (execute);
-        \draw[arrow] (execute) -- (adapt);
-        \draw[arrow] (adapt) -- node[above]{no / done} (finish);
-        \draw[arrow] (adapt) |- node[pos=0.25,right]{yes} (planner);
-    \end{tikzpicture}
-    \caption{Placeholder adaptive-planning workflow. Replace this with the exact LangGraph nodes, edges, conditional routing, and state fields from the studied commit. This diagram does not count towards the 2-page Part II limit.}
-    \label{fig:adaptive-planning-workflow}
+    \includegraphics[width=0.95\linewidth,height=0.72\textheight,keepaspectratio]{figures/lg_diagram.jpg}
+    \caption{Workflow diagram of the adaptive-planning graph in \cmbcommit. Dotted edges are conditional routes from the reviewer and merge routers; solid edges are unconditional graph transitions.}
+    \label{fig:adaptive-planning-langgraph}
 \end{figure}
 
+% \begin{figure}[H]
+%     \centering
+%     \small
+%     \resizebox{\linewidth}{!}{%
+%     \begin{tikzpicture}[
+%         node distance=0.9cm and 1.15cm,
+%         box/.style={draw,rounded corners,align=center,minimum width=2.55cm,minimum height=0.78cm,font=\small},
+%         widebox/.style={draw,rounded corners,align=center,minimum width=3.25cm,minimum height=0.78cm,font=\small},
+%         decision/.style={draw,diamond,aspect=2.25,align=center,inner sep=1pt,font=\small},
+%         statebox/.style={draw,dashed,rounded corners,align=left,font=\scriptsize,text width=0.89\linewidth,inner sep=4pt},
+%         arrow/.style={-Latex,thick}
+%     ]
+%         \node[widebox] (plan) {initial planning graph\\planner $\leftrightarrow$ reviewer\\final \code{Plan}};
+%         \node[box,right=of plan] (start) {START};
+%         \node[widebox,right=of start] (exec) {\code{execute\_step}\\alias of\\\code{deep\_research.run\_step}};
+%         \node[widebox,right=of exec] (review) {\code{adaptive\_review}\\LLM emits\\\code{AdaptiveReview}};
+%         \node[decision,below=of review] (route) {\code{route\_after\_review}};
+%         \node[widebox,left=of route] (replan) {\code{replan\_tail}\\rewrite remaining\\steps};
+%         \node[widebox,left=of replan] (merge) {\code{merge\_plan}\\completed prefix\\+ new tail};
+%         \node[box,right=of route] (end) {END};
+%         \node[statebox,below=1.05cm of replan,anchor=north west,xshift=-1.4cm] (state) {
+%             Threaded state: \code{plan}, \code{step\_index}, \code{step\_summaries}, \code{step\_outcomes}, \code{work\_dir}, \code{adaptive\_review}, \code{new\_tail}, \code{adaptive\_history}.\\
+%             Run context: \code{PlanContext} with \code{main\_task}, model choices, \code{available\_agents}, and execution budgets.
+%         };
+
+%         \draw[arrow] (plan) -- (start);
+%         \draw[arrow] (start) -- (exec);
+%         \draw[arrow] (exec) -- (review);
+%         \draw[arrow] (review) -- (route);
+%         \draw[arrow] (route) -- node[above]{failed step or exhausted plan} (end);
+%         \draw[arrow] (route) -- node[above]{\code{needs\_adaptation}} (replan);
+%         \draw[arrow] (replan) -- (merge);
+%         \draw[arrow] (merge.north) |- node[pos=0.23,above]{steps remain} (exec.south);
+%         \draw[arrow] (route.south) -- ++(0,-0.42) -| node[pos=0.28,below]{no adaptation} (exec.south);
+%         \draw[arrow] (merge.south) |- node[pos=0.22,below]{new plan exhausted} (end.south);
+%     \end{tikzpicture}
+%     }
+%     \caption{Adaptive-planning workflow in \cmbcommit. The initial planner/reviewer loop produces the plan; the adaptive graph then executes one step at a time and may replace only the unexecuted tail. The diagram is excluded from the Part II page limit.}
+%     \label{fig:adaptive-planning-workflow}
+% \end{figure}
+
 \paragraph{Walkthrough.}
-\TODO{In at most half a page, explain what triggers a plan revision, what part of the plan may change, what is held fixed across a revision, and how the loop terminates. Include the exact commit link studied.}
+I studied \cmbcommit.  The initial \code{planning} graph is open-loop: a planner and plan reviewer run a bounded propose--critique loop and produce a structured \code{Plan}.  The adaptive graph consumes that plan.  Its \code{execute\_step} node is the existing \code{deep\_research.run\_step}: it runs the current \code{Step}, appends a summary and outcome, checkpoints the deep-research run, and increments the 1-based \code{step\_index}.  After every executed step, \code{adaptive\_review} asks a critic model whether the remaining steps should be rewritten in light of the latest step summary and outcome.  The revision trigger is therefore the structured field \code{AdaptiveReview.needs\_adaptation}.  If it is true, \code{replan\_tail} asks the planner model for a replacement tail and \code{merge\_plan} splices \(\texttt{completed\_prefix}+\texttt{new\_tail}\) back into \code{plan}.  The completed prefix, its summaries, outcomes, and workspace artefacts are held fixed; only not-yet-executed steps may change.  The graph terminates when the latest step is unfulfilled, when \code{step\_index} is beyond the current plan length, or when a rewrite leaves no remaining steps.  Otherwise control returns to \code{execute\_step}.
 
 \subsection*{II.2 Problems}
 \addcontentsline{toc}{subsection}{II.2 Problems}
 
-\paragraph{Problem 1: \TODO{short name}.}
-\TODO{Argue the limitation or failure mode, grounded in planning and closed-loop control theory.}
+\paragraph{Problem 1: an informal feedback controller.}
+The adaptive graph is closed-loop, but the feedback controller is weak.  As shown in \Cref{fig:adaptive-planning-langgraph}, the only trigger for replanning is the LLM-generated field \code{AdaptiveReview.needs\_adaptation}, computed from the latest step summary, latest outcome, and remaining tail.  There is no explicit uncertainty estimate, cost model, value-of-information test, or task-level error signal.  This means the system can observe execution feedback but cannot reliably decide whether rewriting the plan is worth the extra cost.  In practice, this can cause unnecessary replanning after harmless new information, or leave an invalid tail unchanged when the reviewer fails to recognise that the plan has become stale.
+\TODO{manually review}
 
-\paragraph{Problem 2: \TODO{short name}.}
-\TODO{Argue the limitation or failure mode, grounded in planning and closed-loop control theory.}
+\paragraph{Problem 2: failures end the outer loop rather than trigger repair.}
+If the code returns an error or fails to execute properly, the \code{adaptive\_review} agent will mark the step as unfulfilled and the loop will immediately end. During execution, the engineer agent can invoke the \code{self\_debug} loop but this targets bugs in the code rather than fundamental flaws in the plan. This is an issue because code failing to run is often one of the clearest pieces of evidence that the plan itself is wrong. It does not give the system the chance to review the error and rewrite dependent future steps. The result is a system that can adapt after successful steps, but is least adaptive when plan level recovery would be most useful.
 
-\paragraph{Problem 3: \TODO{short name}.}
-\TODO{Argue the limitation or failure mode, grounded in planning and closed-loop control theory.}
+\paragraph{Problem 3: tail rewrites are myopic and unvalidated.}
+The initial planner uses a reviewer loop and keeps review history, whereas the adaptive replanner directly produces a new tail.  The reviewer sees the latest result and the remaining steps, but not the full initial planning transcript or a rich history of earlier adaptations.  After \code{replan\_tail}, \code{merge\_plan} splices the new tail into the plan without checking task coverage, dependencies on completed artefacts, plan length, or whether the recommendations were actually followed.  The dynamic schema prevents invalid agent names, but it does not ensure that the repaired plan is better.  This makes the adaptive update potentially destabilising: a weak rewrite can replace a sound remaining plan.  The risk is increased by the lack of a revision budget and by the thin \code{adaptive\_history}, which omits the old tail, new tail, and reviewer reason from the persisted evidence.
+\TODO{manually review - no check that the tail is actually better}
 
 \subsection*{II.3 Proposed improvements}
 \addcontentsline{toc}{subsection}{II.3 Proposed improvements}
 
-\paragraph{Improvement 1.}
-\TODO{State what changes, why it addresses the corresponding problem, and what it trades off.}
+\paragraph{Structured adaptation policy.}
+Extend \code{AdaptiveReview} with structured fields for reason category, confidence, expected benefit, extra steps, and estimated cost.  Route to \code{replan\_tail} only when an explicit policy is met, for example a high-confidence hard invalidation or expected benefit above a threshold.  This makes the controller auditable and reduces gratuitous replanning.  The trade-off is prompt and schema complexity, and the numerical scores would still be model judgements rather than calibrated measurements.
 
-\paragraph{Improvement 2.}
-\TODO{State what changes, why it addresses the corresponding problem, and what it trades off.}
+\paragraph{Failure-aware replanning path.}
+Before ending on \code{fulfilled=False}, add a bounded failure-review route that gives the replanner the failed step, failure reason, completed summaries, and remaining tail.  It could insert a repair step, replace the failed step, or mark the failure unrecoverable.  This separates local retry from plan-level repair and better matches closed-loop planning, where failures are observations to condition on.  The trade-off is extra latency after failures and the danger of repeatedly trying to repair an impossible task, so it needs a small retry/revision budget.
 
-\paragraph{Improvement 3.}
-\TODO{State what changes, why it addresses the corresponding problem, and what it trades off.}
+\paragraph{Validated, budgeted tail replacement.}
+\TODO{merge\_plan should validate the plan before merging (effectively same as adaptive review)}
+Insert a \code{validate\_new\_tail} node before \code{merge\_plan}.  It should check that the new tail preserves global task coverage, uses only available agents, does not duplicate completed steps, respects a maximum plan length, and follows the reviewer's recommendations; invalid tails can be sent back to \code{replan\_tail} with feedback, bounded by a \code{PlanContext} revision budget.  Persist each revision with old tail, new tail, reviewer reason, model names, and timestamps.  This improves stability and auditability, at the cost of another critic call per adaptation, larger checkpoints, and some risk of rejecting a creative but useful repair.
 
 % ============================================================
 \newpage
@@ -496,7 +520,7 @@ trade-off is weaker uniform exploration for longer responses.
 \begin{itemize}
     \item Hu, E. J. et al. (2021). \emph{LoRA: Low-Rank Adaptation of Large Language Models}. \url{https://arxiv.org/abs/2106.09685}
     \item Tunix documentation or source link used for GRPO implementation: \url{https://github.com/google/tunix}
-    \item Exact \code{cmbagent\_lg} adaptive-planning commit studied: \TODO{insert clickable commit URL}
+    \item Exact \code{cmbagent\_lg} adaptive-planning commit studied: \url{https://github.com/borisbolliet/cmbagent_lg/tree/d7d0592a714e4cc01c97f1b77afdd57a208b18db}
 \end{itemize}
 
 \appendix
